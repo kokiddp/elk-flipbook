@@ -2,7 +2,7 @@ import './styles/base.css';
 
 import { destroyPdfWorker, loadPdfDocument } from './core/pdfLoader';
 import { renderPageToBlobUrl, type RenderedPage } from './core/pageRenderer';
-import { extractPageText } from './core/textExtraction';
+import { extractPageText, type TextSpan } from './core/textExtraction';
 import { SearchIndex } from './core/searchIndex';
 import { OcrEngine } from './core/ocr';
 import { FlipbookView, type PageAsset } from './core/flipbookView';
@@ -33,11 +33,12 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
     const pageCount = documentProxy.numPages;
     const searchIndex = new SearchIndex();
     const renderedPages: RenderedPage[] = [];
-  const assets: PageAsset[] = [];
-  const ocrEngine = new OcrEngine(ocr);
+    const assets: PageAsset[] = [];
+    const textLayers = new Map<number, TextSpan[]>();
+    const ocrEngine = new OcrEngine(ocr);
 
-  for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
-    const page = await documentProxy.getPage(pageNumber);
+    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+      const page = await documentProxy.getPage(pageNumber);
       emitProgress({
         phase: 'rendering',
         page: pageNumber,
@@ -47,7 +48,7 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
 
       const [rendered, extracted] = await Promise.all([
         renderPageToBlobUrl(page, renderScale),
-        extractPageText(page)
+        extractPageText(page, renderScale)
       ]);
 
       let text = extracted.text;
@@ -66,20 +67,23 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
       }
 
       searchIndex.addPage(pageNumber, text);
+      textLayers.set(pageNumber, extracted.spans);
       assets.push({ url: rendered.url, width: rendered.width, height: rendered.height });
       renderedPages.push(rendered);
-  }
+    }
 
-  const view = new FlipbookView(container, {
-    hardCover,
-    width: assets[0]?.width,
-    height: assets[0]?.height,
-    highlightColor: search?.highlightColor,
-    onFlip: (page) =>
-      emitProgress({
-        phase: 'rendering',
-        page,
-        pages: pageCount,
+    const view = new FlipbookView(container, {
+      hardCover,
+      basePageWidth: assets[0]?.width,
+      basePageHeight: assets[0]?.height,
+      textLayers,
+      renderScale,
+      highlightColor: search?.highlightColor,
+      onFlip: (page) =>
+        emitProgress({
+          phase: 'rendering',
+          page,
+          pages: pageCount,
           message: `Navigated to page ${page}`
         })
     });
@@ -98,7 +102,7 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
         return results;
       },
       highlight: (result: SearchResult) => {
-        view.highlightPage(result.page);
+        view.highlightMatch(result.page, result.index, result.length);
       },
       destroy: () => {
         view.destroy();

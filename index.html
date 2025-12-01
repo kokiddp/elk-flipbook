@@ -100,6 +100,7 @@
         gap: 12px;
         align-items: center;
         box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+        flex-wrap: wrap;
       }
 
       label {
@@ -117,6 +118,59 @@
         font-size: 15px;
         font-family: inherit;
         background: #fff;
+      }
+
+      details.hits {
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        padding: 8px 12px;
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
+      }
+
+      details.hits summary {
+        cursor: pointer;
+        font-weight: 700;
+        color: #0f172a;
+        outline: none;
+      }
+
+      .hits__list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .hit-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: transform 0.1s ease, box-shadow 0.1s ease;
+        text-align: left;
+      }
+
+      .hit-item:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+      }
+
+      .hit-item__page {
+        font-weight: 700;
+        color: #f97316;
+      }
+
+      .hit-item__snippet {
+        flex: 1;
+        color: #374151;
+        font-size: 14px;
       }
 
       button {
@@ -169,6 +223,35 @@
           min-width: 0;
           width: 100%;
         }
+
+        #viewer {
+          height: 480px;
+        }
+
+        .viewer-card {
+          padding: 8px;
+          border-radius: 12px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .shell {
+          padding: 12px 10px 32px;
+        }
+
+        #viewer {
+          height: 400px;
+        }
+
+        .control-card {
+          padding: 10px;
+          gap: 8px;
+        }
+
+        button {
+          padding: 8px 12px;
+          font-size: 13px;
+        }
       }
     </style>
   </head>
@@ -193,8 +276,16 @@
             <input id="search-term" type="search" name="query" placeholder="Find text…" />
           </div>
           <div class="meta" id="search-count">—</div>
-          <button type="submit">Search & Highlight</button>
+          <div class="controls">
+            <button type="submit">Search</button>
+            <button type="button" class="secondary" id="hit-prev">Prev hit</button>
+            <button type="button" class="secondary" id="hit-next">Next hit</button>
+          </div>
         </form>
+        <details class="hits" open>
+          <summary>Results</summary>
+          <div id="hits-list" class="hits__list">No matches yet</div>
+        </details>
 
         <div class="control-card">
           <button type="button" class="secondary" id="prev-page">Prev page</button>
