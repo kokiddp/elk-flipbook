@@ -34,7 +34,7 @@ function multiplyTransform(m1: number[], m2: number[]): number[] {
   ];
 }
 
-function buildSpans(items: TextItem[], viewportTransform: number[]): { spans: TextSpan[]; combined: string } {
+function buildSpans(items: TextItem[], viewportTransform: number[], viewportHeight: number): { spans: TextSpan[]; combined: string } {
   const spans: TextSpan[] = [];
   let cursor = 0;
   const parts: string[] = [];
@@ -45,10 +45,20 @@ function buildSpans(items: TextItem[], viewportTransform: number[]): { spans: Te
     const end = start + text.length;
 
     const transform = multiplyTransform(viewportTransform, item.transform);
-    const width = item.width * viewportTransform[0];
+    const scaleX = Math.abs(viewportTransform[0]);
+    const width = item.width * scaleX;
+    // Height from the transform matrix
     const height = Math.max(Math.abs(transform[3]), Math.abs(transform[1]), item.height ?? 0);
+    
+    // transform[4] is the X position (already in screen coordinates)
     const left = transform[4];
-    const top = transform[5] - height; // align to top-left origin
+    
+    // transform[5] is Y in PDF coordinates (origin at bottom-left, Y up)
+    // We need to convert to screen coordinates (origin at top-left, Y down)
+    // The viewport transform already handles the Y flip, but we need to account for the baseline
+    // After the transform, transform[5] gives us the baseline Y in screen coordinates
+    // We subtract height to get the top of the text box
+    const top = transform[5] - height;
 
     spans.push({ text, start, end, left, top, width, height });
 
@@ -70,7 +80,7 @@ export async function extractPageText(page: PDFPageProxy, scale = 1): Promise<Te
   const textContent = await page.getTextContent({ normalizeWhitespace: true });
   const items = textContent.items.filter((item): item is TextItem => 'str' in item);
 
-  const { spans, combined } = buildSpans(items, viewport.transform);
+  const { spans, combined } = buildSpans(items, viewport.transform, viewport.height);
 
   const density = combined.replace(/\s+/g, '').length;
   return { text: combined, density, spans };

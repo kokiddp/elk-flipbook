@@ -183,35 +183,100 @@ export class FlipbookView {
     const orientation = this.pageFlip.getOrientation();
     const bookRect = this.pageFlip.getBoundsRect();
     
-    // Get stage dimensions
-    const stageRect = this.root.getBoundingClientRect();
+    // Get the overlay rect - highlights are positioned relative to the overlay
+    const overlayRect = this.overlay.getBoundingClientRect();
 
-    // Try to find the page element directly in the DOM
-    // This is the most accurate method when available
+    // Try to find the page element directly in the DOM - most accurate method
     const pageElement = this.findPageElement(pageIndex);
     if (pageElement) {
       const pageRect = pageElement.getBoundingClientRect();
       // Validate the element has reasonable dimensions
       if (pageRect.width > 10 && pageRect.height > 10) {
         return {
-          x: pageRect.left - stageRect.left,
-          y: pageRect.top - stageRect.top,
+          x: pageRect.left - overlayRect.left,
+          y: pageRect.top - overlayRect.top,
           width: pageRect.width,
           height: pageRect.height
         };
       }
     }
 
-    // Fallback: calculate position based on book geometry from getBoundsRect()
-    // bookRect.left/top are relative to the stage element
+    // Fallback: calculate position based on book geometry
+    // Find the actual book container element for accurate positioning
+    const bookContainer = this.stage.querySelector('.stf__wrapper') as HTMLElement;
+    if (bookContainer) {
+      const bookContainerRect = bookContainer.getBoundingClientRect();
+      const displayPageWidth = bookRect.pageWidth;
+      const displayPageHeight = bookRect.height;
+      
+      // Calculate book position relative to overlay
+      const bookOffsetX = bookContainerRect.left - overlayRect.left;
+      const bookOffsetY = bookContainerRect.top - overlayRect.top;
+
+      if (orientation === 'portrait') {
+        // Single page view - page is centered in the book container
+        // In portrait mode, the book width equals the page width
+        return {
+          x: bookOffsetX,
+          y: bookOffsetY,
+          width: displayPageWidth,
+          height: displayPageHeight
+        };
+      }
+
+      // Landscape mode: 2-page spread
+      const currentIndex = this.pageFlip.getCurrentPageIndex();
+      
+      // With showCover=true:
+      // - Index 0 (cover) is shown alone on the right half
+      // - Subsequent spreads pair odd+even indices: [1,2], [3,4], [5,6]
+      
+      if (currentIndex === 0 && pageIndex === 0) {
+        // Cover page is on the right side of the spread area
+        return {
+          x: bookOffsetX + displayPageWidth,
+          y: bookOffsetY,
+          width: displayPageWidth,
+          height: displayPageHeight
+        };
+      }
+
+      // Determine left/right positioning for spread pages
+      const leftPageIndex = currentIndex % 2 === 1 ? currentIndex : currentIndex - 1;
+      const rightPageIndex = leftPageIndex + 1;
+      
+      if (pageIndex === leftPageIndex) {
+        return {
+          x: bookOffsetX,
+          y: bookOffsetY,
+          width: displayPageWidth,
+          height: displayPageHeight
+        };
+      }
+      
+      if (pageIndex === rightPageIndex) {
+        return {
+          x: bookOffsetX + displayPageWidth,
+          y: bookOffsetY,
+          width: displayPageWidth,
+          height: displayPageHeight
+        };
+      }
+    }
+
+    // Last resort fallback using bookRect directly
+    // Note: bookRect.left/top may be relative to stage, not overlay
+    const stageRect = this.stage.getBoundingClientRect();
     const displayPageWidth = bookRect.pageWidth;
     const displayPageHeight = bookRect.height;
-    const bookOriginX = bookRect.left;
-    const bookOriginY = bookRect.top;
+    
+    // Adjust for any offset between stage and overlay
+    const stageToOverlayX = stageRect.left - overlayRect.left;
+    const stageToOverlayY = stageRect.top - overlayRect.top;
+    const bookOriginX = bookRect.left + stageToOverlayX;
+    const bookOriginY = bookRect.top + stageToOverlayY;
 
     if (orientation === 'portrait') {
-      // Single page view - the page fills the book area
-      // In portrait, bookRect.width equals bookRect.pageWidth
       return {
         x: bookOriginX,
         y: bookOriginY,
@@ -220,15 +285,10 @@ export class FlipbookView {
       };
     }
 
-    // Landscape mode: 2-page spread
+    // Landscape fallback
     const currentIndex = this.pageFlip.getCurrentPageIndex();
     
-    // With showCover=true:
-    // - Index 0 (cover) is shown alone on the right half
-    // - Subsequent spreads pair odd+even indices: [1,2], [3,4], [5,6]
-    
     if (currentIndex === 0 && pageIndex === 0) {
-      // Cover page is on the right side
       return {
         x: bookOriginX + displayPageWidth,
         y: bookOriginY,
@@ -237,10 +297,6 @@ export class FlipbookView {
       };
     }
 
-    // Determine left/right positioning for spread pages
-    // The spread showing when currentIndex=N:
-    // - If N is odd: pages N (left) and N+1 (right)
-    // - If N is even: pages N-1 (left) and N (right)
     const leftPageIndex = currentIndex % 2 === 1 ? currentIndex : currentIndex - 1;
     const rightPageIndex = leftPageIndex + 1;
     
@@ -270,16 +326,21 @@ export class FlipbookView {
    * PageFlip creates elements that can be located in the DOM.
    */
   private findPageElement(pageIndex: number): HTMLElement | null {
-    // Try PageFlip's getPage API first
+    // Strategy 1: Use PageFlip's getPage API
     try {
       const pageObj = this.pageFlip.getPage(pageIndex);
       if (pageObj) {
         const element = pageObj.getElement();
-        if (element && element.getBoundingClientRect) {
+        if (element) {
           const rect = element.getBoundingClientRect();
-          // Only use if element is visible and has valid dimensions
-          if (rect.width > 0 && rect.height > 0) {
-            return element;
+          // Check if element is visible on screen with valid dimensions
+          if (rect.width > 10 && rect.height > 10) {
+            // Additional check: element should be within the viewport
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            if (rect.right > 0 && rect.bottom > 0 && rect.left < viewportWidth && rect.top < viewportHeight) {
+              return element;
+            }
           }
         }
       }
@@ -287,13 +348,61 @@ export class FlipbookView {
       // getPage may throw or return null
     }
 
-    // Fallback: search for page elements with specific class patterns
-    // PageFlip uses class names like "stf__item" for page wrappers
+    // Strategy 2: Find page elements by class names used by StPageFlip
+    // StPageFlip uses classes like "stf__item" and may have page number in data attributes
+    const selectors = [
+      `.stf__item[data-page="${pageIndex}"]`,
+      `.stf__item[data-page-number="${pageIndex}"]`,
+      `[data-page="${pageIndex}"]`,
+      `[data-page-number="${pageIndex}"]`
+    ];
+
+    for (const selector of selectors) {
+      const elements = this.stage.querySelectorAll<HTMLElement>(selector);
+      for (const el of elements) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 10 && rect.height > 10) {
+          return el;
+        }
+      }
+    }
+
+    // Strategy 3: Find any visible stf__item and check if it matches based on position
+    // This is useful when data attributes aren't set
     const stfItems = this.stage.querySelectorAll<HTMLElement>('.stf__item');
+    const visibleItems: HTMLElement[] = [];
     for (const item of stfItems) {
-      const pageAttr = item.getAttribute('data-page');
-      if (pageAttr !== null && parseInt(pageAttr, 10) === pageIndex) {
-        return item;
+      const rect = item.getBoundingClientRect();
+      if (rect.width > 10 && rect.height > 10) {
+        visibleItems.push(item);
+      }
+    }
+
+    // In portrait mode, there should be only one visible page
+    // In landscape mode with spreads, there are two
+    const orientation = this.pageFlip.getOrientation();
+    const currentIndex = this.pageFlip.getCurrentPageIndex();
+
+    if (orientation === 'portrait' && visibleItems.length === 1 && currentIndex === pageIndex) {
+      return visibleItems[0] ?? null;
+    }
+
+    if (orientation === 'landscape' && visibleItems.length >= 1) {
+      // Sort by X position (left to right)
+      visibleItems.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+      
+      const leftPageIndex = currentIndex % 2 === 1 ? currentIndex : currentIndex - 1;
+      const rightPageIndex = leftPageIndex + 1;
+
+      if (pageIndex === leftPageIndex && visibleItems[0]) {
+        return visibleItems[0] ?? null;
+      }
+      if (pageIndex === rightPageIndex && visibleItems[1]) {
+        return visibleItems[1] ?? null;
+      }
+      // Cover page (index 0) is alone on the right
+      if (currentIndex === 0 && pageIndex === 0 && visibleItems[0]) {
+        return visibleItems[0] ?? null;
       }
     }
 

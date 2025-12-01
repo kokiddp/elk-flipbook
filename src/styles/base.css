@@ -38,13 +38,13 @@
 
 .elk-flipbook__highlight {
   position: absolute;
-  background: var(--elk-highlight-bg, rgba(255, 225, 150, 0.25));
-  outline: 2px solid var(--elk-highlight-color, rgba(255, 199, 82, 0.7));
-  border-radius: 2px;
+  background: rgba(255, 200, 80, 0.35);
+  outline: 2px solid rgba(255, 160, 60, 0.8);
+  border-radius: 3px;
   pointer-events: none;
-  mix-blend-mode: multiply;
   z-index: 100;
   animation: ef-highlight-appear 0.3s ease-out;
+  box-shadow: 0 0 8px rgba(255, 180, 60, 0.4);
 }
 
 @keyframes ef-pulse {
