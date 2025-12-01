@@ -16,6 +16,14 @@
 - Maintain a per-page text cache and a lightweight inverted index for search; highlight hits in sync with page turns.
 - Provide a small, documented public API (`createFlipbook`, navigation methods, search hooks, teardown).
 - Make the hard-cover effect optional; expose animation timing as config.
+- Current scaffold: `src/flipbook.ts` (main API), `src/core` utilities, `src/demo/main.ts` + `index.html` demo shell, `src/core/searchIndex.test.ts` (vitest).
+
+## Repo layout (current)
+- `src/flipbook.ts` orchestrates PDF loading, rendering to canvases, and PageFlip wiring.
+- `src/core/` holds pdf.js loader, page renderer, search index, OCR wrapper, and view integration.
+- `src/types/` includes API types and minimal module shims for dependencies.
+- `index.html` + `src/demo/main.ts` serve the demo shell (uses a public sample PDF by default).
+- `src/core/searchIndex.test.ts` shows the initial Vitest setup.
 
 ## Performance and UX
 - Lazy-load pages near the viewport; cap concurrent OCR jobs; memoize rendered bitmaps.
@@ -32,3 +40,4 @@
 - Keep README updated with API and roadmap changes.
 - Do not remove OCR fallback or search unless explicitly requested.
 - When choosing alternative libraries, document the rationale and migration steps.
+- Current environment does not have Node installed; use nvm or a local Node >=18 before running scripts.

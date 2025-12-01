@@ -3,7 +3,8 @@
 JavaScript widget to embed PDFs as an interactive flipbook with optional hard cover, realistic page-leaf animations, and searchable text (with OCR fallback when the PDF lacks a text layer).
 
 ## Status
-- Planning and design. No runtime code committed yet.
+- Initial scaffolding in place (Vite + TypeScript + library entry + demo shell).
+- Core loader + flipbook wiring + OCR/search indexing implemented at a first-pass level; demo points to the public TraceMonkey PDF.
 
 ## Goals
 - Drop-in browser component to display PDFs as a flipbook with a configurable hard-cover effect and smooth page-turn animation.
@@ -27,6 +28,55 @@ JavaScript widget to embed PDFs as an interactive flipbook with optional hard co
 6. **Controls**: page nav, zoom, fullscreen toggle, hard-cover on/off, optional spread view, keyboard shortcuts, and ARIA labels for all interactive elements.
 7. **Performance**: lazy-load and prerender pages near the viewport; throttle OCR; cache bitmaps and text; allow host-controlled memory caps.
 
+## Getting started
+> Node is not present on this machine yet; install a recent LTS (>=18) to run these commands.
+
+```bash
+npm install
+npm run dev    # Vite dev server with demo shell
+npm run build  # library build
+npm run preview
+npm test       # unit tests (vitest)
+```
+
+## Current implementation
+- `src/flipbook.ts`: exports `createFlipbook(options)` that loads a PDF via pdf.js, renders pages to blob URLs, feeds them into PageFlip with optional hard cover, and builds a per-page search index.
+- OCR fallback: when extracted text density is below a threshold, Tesseract.js runs against the rendered bitmap; recovered text feeds the search index.
+- Search: per-page search with snippets and result limits; highlights trigger a visual overlay in the flipbook view (text-layer overlay still pending).
+- Demo: `index.html` + `src/demo/main.ts` preload the public TraceMonkey PDF, wire search/navigation buttons, and surface progress updates.
+
+## Public API (early)
+```ts
+import { createFlipbook } from '@elk/flipbook';
+
+const flipbook = await createFlipbook({
+  container: document.getElementById('viewer')!,
+  source: '/docs/catalog.pdf', // URL, File, Blob, ArrayBuffer
+  hardCover: true,
+  renderScale: 1.4,
+  search: { maxResults: 50, highlightColor: '#f59e0b' },
+  ocr: { enabled: true, lang: 'eng', minTextLength: 16 },
+  onProgress: (info) => console.log(info.phase, info.page, info.pages)
+});
+
+const results = await flipbook.search('warranty');
+if (results[0]) {
+  flipbook.highlight(results[0]);
+}
+
+flipbook.goToPage(3);
+flipbook.getPageCount();
+flipbook.destroy();
+```
+
+## Near-term tasks
+- Add a proper text-layer overlay and highlight rendering tied to PageFlip page turns.
+- Improve OCR pipeline (dedicated worker, rate limiting, language config, caching).
+- Add accessibility and keyboard controls; expose events (page change, search hit).
+- Guard bundle size (code-split workers, ensure external deps stay tree-shakeable).
+- Add CI checks, linting, and tests for text extraction/search correctness.
+- Polish demo with controls (search box, navigation, hard-cover toggle).
+
 ## Implementation roadmap
 - **Phase 0**: Repo scaffolding, linting/formatting config, CI smoke checks.
 - **Phase 1**: Core loader (pdf.js) with worker setup, public `createFlipbook` API, and loading states.
@@ -45,7 +95,9 @@ JavaScript widget to embed PDFs as an interactive flipbook with optional hard co
     container: document.getElementById('viewer'),
     source: '/docs/catalog.pdf',
     hardCover: true,
-    search: { highlightColor: '#ffe58f' },
+    renderScale: 1.3,
+    search: { highlightColor: '#ffe58f', maxResults: 20 },
+    ocr: { enabled: true, lang: 'eng', minTextLength: 16 }
   });
 
   // Navigate and search
@@ -55,9 +107,4 @@ JavaScript widget to embed PDFs as an interactive flipbook with optional hard co
 </script>
 ```
 
-## Near-term tasks
-- Lock in the flipbook animation library (start with StPageFlip, keep abstraction to swap if needed).
-- Define the public API surface (creation options, events, methods, teardown).
-- Sketch worker architecture for pdf.js and OCR, plus message contracts.
-- Draft search index structure (per-page text + inverted index + highlights).
-- Add a minimal example page for manual testing once the core loader lands.
+> Note: Example above reflects the intended API; highlight/navigation helpers will land in upcoming iterations.
