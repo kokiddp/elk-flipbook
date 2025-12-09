@@ -138,7 +138,33 @@ export class FlipbookView {
     return this.pageFlip.getCurrentPageIndex() + 1;
   }
 
-  private clearHighlights(): void {
+  /**
+   * Get the current orientation ('portrait' or 'landscape')
+   */
+  getOrientation(): 'portrait' | 'landscape' {
+    return this.pageFlip.getOrientation() as 'portrait' | 'landscape';
+  }
+
+  /**
+   * Force an update/re-render of the flipbook
+   */
+  update(): void {
+    this.pageFlip.update();
+    this.scheduleHighlightRender();
+  }
+
+  /**
+   * Clear all active highlights (public API)
+   */
+  clearHighlights(): void {
+    this.clearHighlightDom();
+    this.activeHighlight = null;
+  }
+
+  /**
+   * Clear highlight DOM elements only (internal use)
+   */
+  private clearHighlightDom(): void {
     this.highlights.forEach((node) => node.remove());
     this.highlights = [];
   }
@@ -268,7 +294,7 @@ export class FlipbookView {
   }
 
   private renderActiveHighlight(currentPage?: number): void {
-    this.clearHighlights();
+    this.clearHighlightDom();
 
     const active = this.activeHighlight;
     if (!active) {

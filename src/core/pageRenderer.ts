@@ -57,9 +57,9 @@ export async function renderPageToBlobUrl(
 
 function dataUrlToBlob(dataUrl: string): Blob {
   const [prefix, data] = dataUrl.split(',');
-  const matches = /data:(.*);base64/.exec(prefix);
+  const matches = /data:(.*);base64/.exec(prefix ?? '');
   const mime = matches?.[1] ?? 'image/png';
-  const binary = atob(data);
+  const binary = atob(data ?? '');
   const array = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) {
     array[i] = binary.charCodeAt(i);

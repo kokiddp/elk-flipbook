@@ -1,6 +1,6 @@
 {
   "name": "elk-flipbook",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "PDF flipbook widget with searchable text and OCR fallback",
   "type": "module",
   "scripts": {

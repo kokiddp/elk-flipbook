@@ -47,7 +47,7 @@ function renderHits(): void {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'hit-item';
-    button.dataset.hitIndex = String(index);
+    button.dataset['hitIndex'] = String(index);
 
     const page = document.createElement('span');
     page.className = 'hit-item__page';
@@ -73,8 +73,10 @@ function highlightHit(index: number): void {
   const clamped = Math.max(0, Math.min(index, searchResults.length - 1));
   currentHit = clamped;
   const hit = searchResults[clamped];
-  flipbook.highlight(hit);
-  setStatus(`Showing match ${clamped + 1}/${searchResults.length} on page ${hit.page}`);
+  if (hit) {
+    flipbook.highlight(hit);
+    setStatus(`Showing match ${clamped + 1}/${searchResults.length} on page ${hit.page}`);
+  }
   updateSearchMeta();
 }
 

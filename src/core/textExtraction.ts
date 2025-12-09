@@ -1,4 +1,5 @@
 import type { PDFPageProxy } from 'pdfjs-dist';
+import type { TextItem as PdfjsTextItem, TextMarkedContent } from 'pdfjs-dist/types/src/display/api';
 
 export interface TextExtractionResult {
   text: string;
@@ -16,14 +17,17 @@ export interface TextSpan {
   height: number;
 }
 
-type TextItem = {
+/** 6-element transformation matrix [a, b, c, d, e, f] */
+type Transform = [number, number, number, number, number, number];
+
+interface TextItem {
   str: string;
-  transform: number[];
+  transform: Transform;
   width: number;
   height?: number;
-};
+}
 
-function multiplyTransform(m1: number[], m2: number[]): number[] {
+function multiplyTransform(m1: Transform, m2: Transform): Transform {
   return [
     m1[0] * m2[0] + m1[2] * m2[1],
     m1[1] * m2[0] + m1[3] * m2[1],
@@ -34,7 +38,22 @@ function multiplyTransform(m1: number[], m2: number[]): number[] {
   ];
 }
 
-function buildSpans(items: TextItem[], viewportTransform: number[], viewportHeight: number): { spans: TextSpan[]; combined: string } {
+function isTextItem(item: PdfjsTextItem | TextMarkedContent): item is PdfjsTextItem {
+  return 'str' in item && 'transform' in item;
+}
+
+function toTextItem(item: PdfjsTextItem): TextItem {
+  // Ensure the transform is exactly 6 elements
+  const t = item.transform;
+  return {
+    str: item.str,
+    transform: [t[0] ?? 0, t[1] ?? 0, t[2] ?? 0, t[3] ?? 0, t[4] ?? 0, t[5] ?? 0],
+    width: item.width,
+    height: item.height
+  };
+}
+
+function buildSpans(items: TextItem[], viewportTransform: Transform, _viewportHeight: number): { spans: TextSpan[]; combined: string } {
   const spans: TextSpan[] = [];
   let cursor = 0;
   const parts: string[] = [];
@@ -77,10 +96,14 @@ function buildSpans(items: TextItem[], viewportTransform: number[], viewportHeig
 
 export async function extractPageText(page: PDFPageProxy, scale = 1): Promise<TextExtractionResult> {
   const viewport = page.getViewport({ scale });
-  const textContent = await page.getTextContent({ normalizeWhitespace: true });
-  const items = textContent.items.filter((item): item is TextItem => 'str' in item);
+  const textContent = await page.getTextContent();
+  const rawItems = textContent.items.filter(isTextItem);
+  const items = rawItems.map(toTextItem);
 
-  const { spans, combined } = buildSpans(items, viewport.transform, viewport.height);
+  const vt = viewport.transform;
+  const viewportTransform: Transform = [vt[0] ?? 0, vt[1] ?? 0, vt[2] ?? 0, vt[3] ?? 0, vt[4] ?? 0, vt[5] ?? 0];
+  
+  const { spans, combined } = buildSpans(items, viewportTransform, viewport.height);
 
   const density = combined.replace(/\s+/g, '').length;
   return { text: combined, density, spans };

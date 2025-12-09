@@ -1,110 +1,314 @@
 # Elk Flipbook
 
-JavaScript widget to embed PDFs as an interactive flipbook with optional hard cover, realistic page-leaf animations, and searchable text (with OCR fallback when the PDF lacks a text layer).
+JavaScript widget to embed PDFs as an interactive flipbook with optional hard cover, realistic page-leaf animations, and full-text search (with OCR fallback for scanned documents).
 
-## Status
-- Initial scaffolding in place (Vite + TypeScript + library entry + demo shell).
-- Core loader + flipbook wiring + OCR/search indexing implemented at a first-pass level; demo points to the public TraceMonkey PDF.
+## Features
 
-## Goals
-- Drop-in browser component to display PDFs as a flipbook with a configurable hard-cover effect and smooth page-turn animation.
-- Preserve searchable, selectable text; run OCR on pages where pdf.js yields no text.
-- Responsive layout, keyboard-friendly navigation, and accessible controls.
-- Minimal host setup (one script + styles) and a small, cacheable bundle.
+- 📖 **Realistic page-turn animations** with hard cover option
+- 🔍 **Full-text search** with highlighting across all pages
+- 🔤 **OCR fallback** for scanned PDFs using Tesseract.js
+- 📱 **Responsive design** - works on desktop and mobile
+- ⌨️ **Keyboard navigation** support
+- 🎨 **Customizable** highlight colors and UI
+- 🔗 **URL parameter support** for deep linking to search terms
+- 🧩 **Optional built-in search UI** or use your own
 
-## Proposed stack and dependencies
-- TypeScript + Vite for bundling and dev ergonomics.
-- pdf.js for PDF parsing, page rendering, and text extraction.
-- StPageFlip (or similar) for the flipbook/page-turn animation and hard-cover option.
-- Tesseract.js for OCR fallback when text extraction fails or yields empty content.
-- Web workers for pdf.js and OCR to avoid blocking the main thread.
-
-## Planned data flow
-1. **Input**: accept a PDF URL, File/Blob, or ArrayBuffer.
-2. **Preflight**: load with pdf.js; attempt text extraction per page. Flag pages with no/low text density for OCR.
-3. **Rendering**: prerender each page to canvas or image bitmaps; feed them into the flipbook component; overlay a hidden text layer to keep selection/search aligned with visuals.
-4. **OCR fallback**: for flagged pages, run Tesseract.js in a worker against the rendered bitmap; cache results; merge into the page text index.
-5. **Search**: build a per-page index plus a lightweight inverted index. Support highlight + navigation to each hit, respecting current page-turn animations.
-6. **Controls**: page nav, zoom, fullscreen toggle, hard-cover on/off, optional spread view, keyboard shortcuts, and ARIA labels for all interactive elements.
-7. **Performance**: lazy-load and prerender pages near the viewport; throttle OCR; cache bitmaps and text; allow host-controlled memory caps.
-
-## Getting started
-> Node is not present on this machine yet; install a recent LTS (>=18) to run these commands.
+## Installation
 
 ```bash
-npm install
-npm run dev    # Vite dev server with demo shell
-npm run build  # library build
-npm run preview
-npm test       # unit tests (vitest)
+npm install elk-flipbook
 ```
 
-## Current implementation
-- `src/flipbook.ts`: exports `createFlipbook(options)` that loads a PDF via pdf.js, renders pages to blob URLs, feeds them into PageFlip with optional hard cover, and builds a per-page search index.
-- OCR fallback: when extracted text density is below a threshold, Tesseract.js runs against the rendered bitmap; recovered text feeds the search index.
-- Search: per-page search with snippets and result limits; highlights trigger a visual overlay in the flipbook view (text-layer overlay still pending).
-- Demo: `index.html` + `src/demo/main.ts` preload the public TraceMonkey PDF, wire search/navigation buttons, and surface progress updates.
+Or use via CDN:
 
-## Public API (early)
-```ts
-import { createFlipbook } from '@elk/flipbook';
+```html
+<script src="https://unpkg.com/elk-flipbook/dist/elk-flipbook.umd.js"></script>
+```
+
+## Quick Start
+
+### Basic Usage
+
+```javascript
+import { createFlipbook } from 'elk-flipbook';
 
 const flipbook = await createFlipbook({
-  container: document.getElementById('viewer')!,
-  source: '/docs/catalog.pdf', // URL, File, Blob, ArrayBuffer
-  hardCover: true,
-  renderScale: 1.4,
-  search: { maxResults: 50, highlightColor: '#f59e0b' },
-  ocr: { enabled: true, lang: 'eng', minTextLength: 16 },
-  onProgress: (info) => console.log(info.phase, info.page, info.pages)
+  container: '#viewer',        // CSS selector or HTMLElement
+  source: '/path/to/doc.pdf'   // URL, File, Blob, or ArrayBuffer
 });
 
-const results = await flipbook.search('warranty');
-if (results[0]) {
+// Navigate
+flipbook.goToPage(5);
+flipbook.nextPage();
+flipbook.previousPage();
+
+// Search
+const results = await flipbook.search('keyword');
+if (results.length > 0) {
   flipbook.highlight(results[0]);
 }
 
-flipbook.goToPage(3);
-flipbook.getPageCount();
+// Clean up
 flipbook.destroy();
 ```
 
-## Near-term tasks
-- Add a proper text-layer overlay and highlight rendering tied to PageFlip page turns.
-- Improve OCR pipeline (dedicated worker, rate limiting, language config, caching).
-- Add accessibility and keyboard controls; expose events (page change, search hit).
-- Guard bundle size (code-split workers, ensure external deps stay tree-shakeable).
-- Add CI checks, linting, and tests for text extraction/search correctness.
-- Polish demo with controls (search box, navigation, hard-cover toggle).
+### With Built-in Search UI
 
-## Implementation roadmap
-- **Phase 0**: Repo scaffolding, linting/formatting config, CI smoke checks.
-- **Phase 1**: Core loader (pdf.js) with worker setup, public `createFlipbook` API, and loading states.
-- **Phase 2**: Flipbook view integration (StPageFlip or alternative) with hard-cover toggle and responsive sizing.
-- **Phase 3**: Text-layer overlay, search index, highlight rendering, and navigation controls.
-- **Phase 4**: OCR fallback pipeline, caching strategy, and background priority controls.
-- **Phase 5**: Theming hooks, accessibility passes, and example playground.
+```javascript
+import { ElkFlipbook } from 'elk-flipbook';
 
-## Usage sketch (planned)
+const flipbook = await ElkFlipbook.create({
+  container: '#viewer',
+  source: '/path/to/doc.pdf',
+  hardCover: true,
+  searchUI: {
+    enabled: true,
+    position: 'top-right',     // 'top-left', 'top-right', 'bottom-left', 'bottom-right'
+    showResults: true,
+    showNavigation: true
+  },
+  initialSearch: 'warranty',   // Pre-search on load
+  readSearchFromUrl: true      // Read ?q= or ?search= from URL
+});
+```
+
+### Script Tag Usage
+
 ```html
 <div id="viewer"></div>
-<script type="module">
-  import { createFlipbook } from '@elk/flipbook';
 
-  const flipbook = await createFlipbook({
-    container: document.getElementById('viewer'),
-    source: '/docs/catalog.pdf',
+<script src="https://unpkg.com/elk-flipbook/dist/elk-flipbook.umd.js"></script>
+<script>
+  ElkFlipbook.create({
+    container: '#viewer',
+    source: '/path/to/doc.pdf',
     hardCover: true,
-    renderScale: 1.3,
-    search: { highlightColor: '#ffe58f', maxResults: 20 },
-    ocr: { enabled: true, lang: 'eng', minTextLength: 16 }
+    searchUI: { enabled: true }
+  }).then(flipbook => {
+    console.log('Flipbook ready!', flipbook.getPageCount(), 'pages');
   });
-
-  // Navigate and search
-  flipbook.goToPage(4);
-  const results = await flipbook.search('warranty');
-  flipbook.highlight(results[0]);
 </script>
 ```
 
-> Note: Example above reflects the intended API; highlight/navigation helpers will land in upcoming iterations.
+## API Reference
+
+### `createFlipbook(options)` / `ElkFlipbook.create(options)`
+
+Creates a new flipbook instance.
+
+#### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `container` | `string \| HTMLElement` | required | CSS selector or DOM element |
+| `source` | `PdfSource` | required | PDF URL, File, Blob, or ArrayBuffer |
+| `hardCover` | `boolean` | `true` | Enable hard cover effect |
+| `renderScale` | `number` | `1.4` | Page render quality (1-3) |
+| `startPage` | `number` | `1` | Initial page to display |
+| `search` | `SearchOptions` | `{}` | Search configuration |
+| `searchUI` | `SearchUIOptions` | `undefined` | Built-in search UI config |
+| `ocr` | `OcrOptions` | `{}` | OCR configuration |
+| `initialSearch` | `string` | `undefined` | Search term to run on load |
+| `readSearchFromUrl` | `boolean` | `true` | Read search from URL params |
+| `autoHighlightFirst` | `boolean` | `true` | Auto-highlight first result |
+
+#### Event Callbacks
+
+| Callback | Parameters | Description |
+|----------|------------|-------------|
+| `onProgress` | `(event: ProgressEvent)` | Loading/rendering progress |
+| `onReady` | `(instance: FlipbookInstance)` | Flipbook is ready |
+| `onError` | `(error: Error)` | Error occurred |
+| `onPageChange` | `(page: number, total: number)` | Page was turned |
+| `onSearch` | `(query: string, results: SearchResult[])` | Search completed |
+| `onHighlight` | `(result: SearchResult, index: number)` | Result highlighted |
+
+### FlipbookInstance
+
+#### Navigation
+
+```typescript
+flipbook.goToPage(page: number, animate?: boolean): void
+flipbook.nextPage(): void
+flipbook.previousPage(): void
+flipbook.firstPage(): void
+flipbook.lastPage(): void
+flipbook.getCurrentPage(): number
+flipbook.getPageCount(): number
+```
+
+#### Search
+
+```typescript
+flipbook.search(query: string): Promise<SearchResult[]>
+flipbook.highlight(result: SearchResult): void
+flipbook.clearHighlights(): void
+flipbook.getSearchResults(): SearchResult[]
+flipbook.nextHighlight(): void
+flipbook.previousHighlight(): void
+flipbook.getCurrentHighlightIndex(): number
+```
+
+#### Events
+
+```typescript
+// Subscribe to events
+const unsubscribe = flipbook.on('pagechange', ({ page, totalPages }) => {
+  console.log(`Page ${page} of ${totalPages}`);
+});
+
+// Available events: 'ready', 'pagechange', 'search', 'highlight', 'error', 'destroy'
+flipbook.on('search', ({ query, results }) => { });
+flipbook.on('highlight', ({ result, index }) => { });
+
+// Unsubscribe
+unsubscribe();
+// or
+flipbook.off('pagechange', handler);
+```
+
+#### UI Control
+
+```typescript
+flipbook.showSearchUI(): void
+flipbook.hideSearchUI(): void
+flipbook.toggleSearchUI(): void
+flipbook.focusSearch(): void
+```
+
+#### State & Lifecycle
+
+```typescript
+flipbook.getState(): FlipbookState
+flipbook.isReady(): boolean
+flipbook.update(): void
+flipbook.destroy(): void
+```
+
+### SearchResult
+
+```typescript
+interface SearchResult {
+  page: number;      // 1-indexed page number
+  index: number;     // Character index in page text
+  length: number;    // Length of match
+  snippet?: string;  // Context around the match
+}
+```
+
+## URL Parameters
+
+The flipbook can read initial search from URL parameters:
+
+- `?q=keyword`
+- `?search=keyword`
+- `?query=keyword`
+
+## Global Instance Management
+
+```javascript
+import { getInstances, destroyAll } from 'elk-flipbook';
+
+// Get all active flipbook instances
+const instances = getInstances();
+
+// Destroy all instances (useful for SPA cleanup)
+destroyAll();
+```
+
+## Customization
+
+### Search Options
+
+```javascript
+{
+  search: {
+    highlightColor: '#f59e0b',  // Highlight color (CSS color)
+    maxResults: 100,            // Max results to return
+    minQueryLength: 2           // Min characters to trigger search
+  }
+}
+```
+
+### OCR Options
+
+```javascript
+{
+  ocr: {
+    enabled: true,      // Enable OCR for scanned pages
+    lang: 'eng',        // Tesseract language code
+    minTextLength: 50   // Min text chars before triggering OCR
+  }
+}
+```
+
+### Search UI Options
+
+```javascript
+{
+  searchUI: {
+    enabled: true,
+    position: 'top-right',
+    placeholder: 'Search document...',
+    showResults: true,
+    resultsMaxHeight: 300,
+    autoExpandResults: true,
+    showNavigation: true,
+    className: 'my-custom-class',
+    labels: {
+      search: 'Search',
+      placeholder: 'Search...',
+      noResults: 'No results found',
+      resultsCount: '{count} results',
+      prevHit: '← Previous',
+      nextHit: 'Next →'
+    }
+  }
+}
+```
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Start dev server
+npm run dev
+
+# Build library
+npm run build
+
+# Run tests
+npm test
+
+# Type check
+npm run typecheck
+```
+
+### Demo
+
+The demo uses a custom search UI implementation and loads a public sample PDF:
+
+- Default: `http://localhost:5173/`
+- With search: `http://localhost:5173/?q=function`
+
+To test the built-in SearchUI component, modify the demo or create a separate test page using the `searchUI: { enabled: true }` option.
+
+## Browser Support
+
+- Chrome/Edge 80+
+- Firefox 75+
+- Safari 14+
+- iOS Safari 14+
+- Android Chrome 80+
+
+## Dependencies
+
+- [pdf.js](https://mozilla.github.io/pdf.js/) - PDF parsing and rendering
+- [StPageFlip](https://nodlik.github.io/StPageFlip/) - Page flip animations
+- [Tesseract.js](https://tesseract.projectnaptha.com/) - OCR engine (optional)
+
+## License
+
+MIT
