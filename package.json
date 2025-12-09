@@ -12,17 +12,14 @@
   },
   "dependencies": {
     "page-flip": "^2.0.7",
-    "pdfjs-dist": "^4.4.168",
-    "tesseract.js": "^5.0.3"
+    "pdfjs-dist": "^4.10.38",
+    "tesseract.js": "^5.1.1"
   },
   "devDependencies": {
-    "@types/node": "^20.10.5",
-    "esbuild": "^0.27.0",
-    "typescript": "^5.3.3",
-    "vite": "^5.0.0",
-    "vitest": "^1.0.4"
-  },
-  "overrides": {
-    "esbuild": "^0.27.0"
+    "@types/node": "^20.19.26",
+    "esbuild": "^0.27.1",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21",
+    "vitest": "^1.6.1"
   }
 }

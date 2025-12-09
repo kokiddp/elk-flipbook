@@ -157,90 +157,6 @@ export interface OcrOptions {
 }
 
 // ============================================================================
-// UI Configuration
-// ============================================================================
-
-/**
- * Configuration for the flipbook toolbar/controls.
- */
-export interface ToolbarOptions {
-  /**
-   * Enable the built-in toolbar.
-   * @default true
-   */
-  enabled?: boolean;
-
-  /**
-   * Show page navigation buttons.
-   * @default true
-   */
-  showNavigation?: boolean;
-
-  /**
-   * Show current page indicator.
-   * @default true
-   */
-  showPageIndicator?: boolean;
-
-  /**
-   * Show fullscreen toggle button.
-   * @default false
-   */
-  showFullscreen?: boolean;
-
-  /**
-   * Show zoom controls.
-   * @default false
-   */
-  showZoom?: boolean;
-
-  /**
-   * Position of the toolbar.
-   * @default 'bottom'
-   */
-  position?: 'top' | 'bottom';
-
-  /**
-   * Custom CSS class for the toolbar.
-   */
-  className?: string;
-}
-
-/**
- * Theme configuration for the flipbook.
- */
-export interface ThemeOptions {
-  /**
-   * Primary accent color.
-   * @default '#f59e0b'
-   */
-  accentColor?: string;
-
-  /**
-   * Background color/gradient for the flipbook container.
-   */
-  background?: string;
-
-  /**
-   * Border radius for the flipbook container.
-   * @default '12px'
-   */
-  borderRadius?: string;
-
-  /**
-   * Enable shadow effects.
-   * @default true
-   */
-  shadow?: boolean;
-
-  /**
-   * Dark mode theme.
-   * @default false
-   */
-  darkMode?: boolean;
-}
-
-// ============================================================================
 // Main Configuration
 // ============================================================================
 
@@ -273,36 +189,6 @@ export interface FlipbookOptions {
   renderScale?: number;
 
   /**
-   * Page flip animation duration in milliseconds.
-   * @default 800
-   */
-  flipDuration?: number;
-
-  /**
-   * Enable page turn on click/tap.
-   * @default true
-   */
-  clickToFlip?: boolean;
-
-  /**
-   * Enable keyboard navigation (arrow keys, etc.).
-   * @default true
-   */
-  keyboardNavigation?: boolean;
-
-  /**
-   * Enable swipe gestures on touch devices.
-   * @default true
-   */
-  swipeNavigation?: boolean;
-
-  /**
-   * Enable mouse wheel navigation.
-   * @default false
-   */
-  wheelNavigation?: boolean;
-
-  /**
    * Initial page to display (1-indexed).
    * @default 1
    */
@@ -322,16 +208,6 @@ export interface FlipbookOptions {
    * OCR configuration for image-based PDFs.
    */
   ocr?: OcrOptions;
-
-  /**
-   * Toolbar configuration.
-   */
-  toolbar?: ToolbarOptions;
-
-  /**
-   * Theme configuration.
-   */
-  theme?: ThemeOptions;
 
   /**
    * Initial search query to execute after loading.

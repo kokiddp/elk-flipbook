@@ -8,8 +8,8 @@ JavaScript widget to embed PDFs as an interactive flipbook with optional hard co
 - 🔍 **Full-text search** with highlighting across all pages
 - 🔤 **OCR fallback** for scanned PDFs using Tesseract.js
 - 📱 **Responsive design** - works on desktop and mobile
-- ⌨️ **Keyboard navigation** support
-- 🎨 **Customizable** highlight colors and UI
+- 🎛️ **Vanilla StPageFlip** layout/animations with default interactions
+- 🎨 **Configurable** highlight colors and search UI hooks
 - 🔗 **URL parameter support** for deep linking to search terms
 - 🧩 **Optional built-in search UI** or use your own
 
@@ -39,6 +39,7 @@ const flipbook = await createFlipbook({
 
 // Navigate
 flipbook.goToPage(5);
+flipbook.goToPage(10, false); // jump without animation
 flipbook.nextPage();
 flipbook.previousPage();
 
@@ -266,6 +267,10 @@ destroyAll();
   }
 }
 ```
+
+### Styling
+
+The flipbook wrapper now uses StPageFlip's default layout and animations. The bundled `src/styles/base.css` only sets up relative positioning and the highlight overlay; tweak `--elk-highlight-color` / `--elk-highlight-bg` if you want different highlight tones.
 
 ## Development
 

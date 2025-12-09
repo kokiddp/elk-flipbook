@@ -24,6 +24,5 @@ export type {
   SearchResult,
   SearchUIOptions,
   SearchUIPosition,
-  SearchUILabels,
-  ToolbarOptions
+  SearchUILabels
 } from './types/api';

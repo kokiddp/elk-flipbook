@@ -173,12 +173,10 @@ hitNextButton?.addEventListener('click', () => {
 
 prevButton?.addEventListener('click', () => {
   if (!flipbook) return;
-  const current = flipbook.getCurrentPage();
-  flipbook.goToPage(Math.max(1, current - 1));
+  flipbook.previousPage();
 });
 
 nextButton?.addEventListener('click', () => {
   if (!flipbook) return;
-  const current = flipbook.getCurrentPage();
-  flipbook.goToPage(Math.min(flipbook.getPageCount(), current + 1));
+  flipbook.nextPage();
 });

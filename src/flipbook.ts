@@ -204,7 +204,6 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
       basePageWidth: assets[0]?.width ?? 600,
       basePageHeight: assets[0]?.height ?? 800,
       textLayers,
-      renderScale,
       highlightColor: search.highlightColor,
       onFlip: (page) => {
         onPageChange?.(page, pageCount);
@@ -223,11 +222,7 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
     const instance: FlipbookInstance = {
       // Navigation
       goToPage: (page: number, animate = true) => {
-        if (animate) {
-          view.goToPage(page);
-        } else {
-          view.goToPage(page);  // TODO: Add non-animated navigation to FlipbookView
-        }
+        view.goToPage(page, animate);
       },
       nextPage: () => view.nextPage(),
       previousPage: () => view.previousPage(),
@@ -333,13 +328,13 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
         searchQuery,
         searchResults: [...searchResults],
         highlightIndex: currentHighlightIndex,
-        orientation: view.getOrientation?.() ?? 'landscape'
+        orientation: view.getOrientation()
       }),
 
       isReady: () => isReady,
 
       // Lifecycle
-      update: () => view.update?.(),
+      update: () => view.update(),
 
       destroy: () => {
         emit('destroy', {});
