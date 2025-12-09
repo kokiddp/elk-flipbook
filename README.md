@@ -1,4 +1,4 @@
-# Elk Flipbook
+# Elk Flipbook (v0.3.0)
 
 JavaScript widget to embed PDFs as an interactive flipbook with optional hard cover, realistic page-leaf animations, and full-text search (with OCR fallback for scanned documents).
 
@@ -12,6 +12,8 @@ JavaScript widget to embed PDFs as an interactive flipbook with optional hard co
 - 🎨 **Configurable** highlight colors and search UI hooks
 - 🔗 **URL parameter support** for deep linking to search terms
 - 🧩 **Optional built-in search UI** or use your own
+
+> Hard-cover mode is now implemented by padding a blank page at the start and end while StPageFlip runs with `showCover: false`, keeping the layout predictable in both portrait and landscape.
 
 ## Installation
 
@@ -103,7 +105,7 @@ Creates a new flipbook instance.
 |--------|------|---------|-------------|
 | `container` | `string \| HTMLElement` | required | CSS selector or DOM element |
 | `source` | `PdfSource` | required | PDF URL, File, Blob, or ArrayBuffer |
-| `hardCover` | `boolean` | `true` | Enable hard cover effect |
+| `hardCover` | `boolean` | `true` | Pads a blank page before/after the PDF to simulate covers (StPageFlip still runs with `showCover: false`) |
 | `renderScale` | `number` | `1.4` | Page render quality (1-3) |
 | `startPage` | `number` | `1` | Initial page to display |
 | `search` | `SearchOptions` | `{}` | Search configuration |
@@ -112,6 +114,34 @@ Creates a new flipbook instance.
 | `initialSearch` | `string` | `undefined` | Search term to run on load |
 | `readSearchFromUrl` | `boolean` | `true` | Read search from URL params |
 | `autoHighlightFirst` | `boolean` | `true` | Auto-highlight first result |
+
+**Behavior notes**
+
+- In hard-cover mode the first/last pages are blank padders; logical page numbers still match the PDF (page 1 = first real PDF page). Blank padders are skipped automatically on load and clamped on resize/orientation changes.
+- Highlights clear as soon as navigation starts (flip gesture or programmatic navigation) and re-render after the new page settles.
+- Portrait mode renders the single page on the right half of the canvas (matching StPageFlip), which the highlight overlay respects.
+- pdf.js runs in a worker; call `destroy()` to tear down both the worker and any blob URLs created during rendering.
+
+#### SearchOptions
+
+- `highlightColor`: CSS color used for hit overlays.
+- `maxResults`: limit the number of matches returned.
+- `minQueryLength`: minimum characters before a search runs (default 2).
+
+#### SearchUIOptions (built-in panel)
+
+- `enabled`: render the bundled search panel (defaults to `false`).
+- `position`: `'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom'`.
+- `placeholder`, `labels`: customize copy (i18n-friendly).
+- `showResults`, `resultsMaxHeight`, `autoExpandResults`: control results list.
+- `showNavigation`: render prev/next-hit buttons.
+- `className`: extra class hook for styling.
+
+#### OcrOptions
+
+- `enabled`: run Tesseract.js on pages with low text density.
+- `lang`: language code passed to Tesseract (default `eng`).
+- `minTextLength`: minimum extracted characters before OCR kicks in.
 
 #### Event Callbacks
 
@@ -204,6 +234,15 @@ The flipbook can read initial search from URL parameters:
 - `?q=keyword`
 - `?search=keyword`
 - `?query=keyword`
+
+## Performance tips
+
+- Lower `renderScale` (e.g., 1.2) on very large PDFs to reduce memory/CPU.
+- Disable `hardCover` if you don't need the padded blanks; it avoids loading two extra images.
+- Avoid enabling OCR (`ocr.enabled`) unless the document is mostly scanned images; it runs Tesseract.js in-browser.
+- Keep search queries at or above `minQueryLength` to reduce unnecessary indexing work on short strings.
+- Call `destroy()` when the viewer is no longer needed to release blob URLs and the pdf.js worker.
+- Keep `esbuild` patched (>=0.24.3; repo pins to 0.27.x via overrides) and reinstall dependencies after upgrading Node to avoid audit noise.
 
 ## Global Instance Management
 

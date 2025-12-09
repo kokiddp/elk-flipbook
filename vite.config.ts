@@ -13,11 +13,14 @@ export default defineConfig({
       fileName: (format) => `elk-flipbook.${format}.js`
     },
     rollupOptions: {
-      external: ['page-flip', 'pdfjs-dist', 'tesseract.js']
+      external: ['page-flip', 'pdfjs-dist', 'tesseract.js'],
+      output: {
+        globals: {
+          'page-flip': 'pageFlip',
+          'pdfjs-dist': 'pdfjsDist',
+          'tesseract.js': 'tesseract_js'
+        }
+      }
     }
-  },
-  test: {
-    environment: 'node',
-    include: ['src/**/*.test.ts']
   }
 });

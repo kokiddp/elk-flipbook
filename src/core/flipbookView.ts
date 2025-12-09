@@ -28,6 +28,8 @@ export class FlipbookView {
   private readonly basePageHeight: number;
   private readonly pageOffset: number;
   private readonly totalPages: number;
+  private isAdjustingPage = false;
+  private pointerGuard: (event: PointerEvent) => void;
   private activeHighlight: { page: number; start: number; length: number } | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private resizeHandler: () => void;
@@ -38,12 +40,12 @@ export class FlipbookView {
    * Supports hex and rgb/rgba formats; falls back to the original string otherwise.
    */
   private toRgba(color: string, alpha: number): string {
-    const hex = /^#([0-9a-fA-F]{3,8})$/;
-    const rgb = /^rgba?\((\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*([0-9.]+))?\)$/;
+    const trimmed = color.trim();
+    if (!trimmed) return color;
 
-    const hexMatch = hex.exec(color.trim());
-    if (hexMatch) {
-      let value = hexMatch[1];
+    const hexMatch = /^#(?<value>[0-9a-fA-F]{3,8})$/.exec(trimmed);
+    if (hexMatch?.groups?.['value']) {
+      let value = hexMatch.groups['value'];
       if (value.length === 3 || value.length === 4) {
         value = value.split('').map((c) => c + c).join('');
       }
@@ -61,14 +63,17 @@ export class FlipbookView {
       return `rgba(${r}, ${g}, ${b}, ${finalAlpha})`;
     }
 
-    const rgbMatch = rgb.exec(color.trim());
+    const rgbMatch = /^rgba?\((\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*([0-9.]+))?\)$/.exec(trimmed);
     if (rgbMatch) {
-      const r = parseInt(rgbMatch[1], 10);
-      const g = parseInt(rgbMatch[2], 10);
-      const b = parseInt(rgbMatch[3], 10);
-      const baseAlpha = rgbMatch[4] ? parseFloat(rgbMatch[4]) : 1;
-      const finalAlpha = Math.max(0, Math.min(1, baseAlpha * alpha));
-      return `rgba(${r}, ${g}, ${b}, ${finalAlpha})`;
+      const [, rStr, gStr, bStr, aStr] = rgbMatch;
+      if (rStr && gStr && bStr) {
+        const r = parseInt(rStr, 10);
+        const g = parseInt(gStr, 10);
+        const b = parseInt(bStr, 10);
+        const baseAlpha = aStr ? parseFloat(aStr) : 1;
+        const finalAlpha = Math.max(0, Math.min(1, baseAlpha * alpha));
+        return `rgba(${r}, ${g}, ${b}, ${finalAlpha})`;
+      }
     }
 
     return color;
@@ -115,6 +120,27 @@ export class FlipbookView {
 
     this.pageFlip.on('flip', (event) => {
       const physicalIndex = typeof event.data === 'number' ? event.data : Number(event.data);
+
+      // Prevent landing on padded blank pages (hard cover) regardless of input method
+      if (!this.isAdjustingPage) {
+        const logicalIndex = physicalIndex - this.pageOffset;
+        const maxLogicalIndex = this.getPageCount() - 1;
+
+        if (logicalIndex < 0) {
+          this.isAdjustingPage = true;
+          this.pageFlip.turnToPage(this.pageOffset);
+          this.isAdjustingPage = false;
+          return;
+        }
+
+        if (logicalIndex > maxLogicalIndex) {
+          this.isAdjustingPage = true;
+          this.pageFlip.turnToPage(this.pageOffset + maxLogicalIndex);
+          this.isAdjustingPage = false;
+          return;
+        }
+      }
+
       const pageNumber = physicalIndex + 1;
       const logicalPage = Math.max(1, Math.min(this.getPageCount(), pageNumber - this.pageOffset));
       // Delay highlight rendering to ensure page flip animation has settled
@@ -123,7 +149,8 @@ export class FlipbookView {
     });
 
     // Hide highlight overlay as soon as a flip begins (desktop or mobile)
-    this.pageFlip.on('changeState', (_app, state: string) => {
+    this.pageFlip.on('changeState', (payload: { data: unknown }) => {
+      const state = typeof payload?.data === 'string' ? payload.data : '';
       if (state === 'flipping' || state === 'user_fold') {
         this.clearHighlightDom();
       }
@@ -134,6 +161,20 @@ export class FlipbookView {
       this.clampToLogicalRange();
       this.scheduleHighlightRender();
     });
+
+    // Block clicks that would navigate into padded blank pages
+    this.pointerGuard = (event: PointerEvent) => {
+      const rect = this.stage.getBoundingClientRect();
+      const isForward = event.clientX - rect.left > rect.width / 2;
+      const logicalPage = this.getCurrentPage();
+      const lastLogical = this.getPageCount();
+      if ((isForward && logicalPage >= lastLogical) || (!isForward && logicalPage <= 1)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    this.stage.addEventListener('pointerdown', this.pointerGuard, { capture: true });
 
     this.resizeHandler = () => {
       this.pageFlip.update();
@@ -160,6 +201,9 @@ export class FlipbookView {
   }
 
   loadFromAssets(assets: PageAsset[]): void {
+    if (!assets.length) {
+      throw new Error('No page assets provided to FlipbookView.');
+    }
     this.pageFlip.loadFromImages(assets.map((asset) => asset.url));
     this.clampToLogicalRange();
   }
@@ -396,6 +440,7 @@ export class FlipbookView {
   ): void {
     const end = active.start + active.length;
     const matches = spans.filter((span) => span.end > active.start && span.start < end);
+    const fragment = document.createDocumentFragment();
 
     matches.forEach((span) => {
       const overlapStart = Math.max(span.start, active.start);
@@ -409,9 +454,11 @@ export class FlipbookView {
       highlight.style.width = `${span.width * scaleX}px`;
       highlight.style.height = `${span.height * scaleY}px`;
       highlight.style.opacity = `${Math.min(1, 0.4 + ratio * 0.6)}`;
-      this.overlay.appendChild(highlight);
+      fragment.appendChild(highlight);
       this.highlights.push(highlight);
     });
+
+    this.overlay.appendChild(fragment);
   }
 
   highlightMatch(page: number, start: number, length: number): void {
@@ -447,6 +494,9 @@ export class FlipbookView {
     }
     if (this.resizeHandler) {
       window.removeEventListener('resize', this.resizeHandler);
+    }
+    if (this.pointerGuard) {
+      this.stage.removeEventListener('pointerdown', this.pointerGuard, { capture: true } as EventListenerOptions);
     }
   }
 }

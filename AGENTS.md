@@ -6,7 +6,7 @@
 ## Stack choices
 - Language: TypeScript (strict mode).
 - Bundler/dev server: Vite.
-- PDF parsing: pdf.js (pdfjs-dist v4.4.168) with worker support.
+- PDF parsing: pdf.js (pdfjs-dist v4.10.38) with worker support.
 - Flipbook animation: page-flip (StPageFlip v2.0.7), abstracted behind FlipbookView.
 - OCR: Tesseract.js v5.x in a dedicated wrapper; only invoked for pages with empty/low text density.
 
@@ -15,7 +15,7 @@
 - Render pages to blob URLs for the flipbook canvas; use text span data for search highlighting.
 - Maintain a per-page text cache and search index; highlight hits overlay on the canvas using screen coordinates.
 - Provide a documented public API (`createFlipbook`, `ElkFlipbook.create`, navigation methods, search hooks, events, teardown).
-- Make the hard-cover effect optional; expose animation timing and highlight colors as config.
+- Make the hard-cover effect optional; expose animation timing and highlight colors as config. Hard-cover mode pads blank pages while StPageFlip still runs with showCover=false.
 - Support optional built-in SearchUI component or allow custom implementations.
 
 ## Repo layout (current)
@@ -56,6 +56,7 @@ tsconfig.json              # TypeScript configuration
 - FlipbookView transforms PDF text spans to screen coordinates with proper scaling
 - Portrait mode requires offset adjustment (single page rendered on right side of book bounds)
 - `clearHighlightDom()` (internal) vs `clearHighlights()` (public API) separation is critical
+- Highlights clear at the start of navigation (flip gestures or programmatic calls) and re-render after the new page settles.
 
 ### Event system
 - Flipbook instances support `on(event, handler)` / `off(event, handler)` pattern
@@ -72,6 +73,7 @@ tsconfig.json              # TypeScript configuration
 - OCR runs only when text density is below threshold (minTextLength).
 - Resize observer and debounced highlight re-renders prevent flicker.
 - Keyboard navigation support; responsive layouts for mobile/desktop.
+- In hard-cover mode, blank first/last pages are automatically skipped/clamped after load, resize, or orientation change (important for portrait/mobile).
 
 ## Testing and tooling
 - npm scripts: `npm install`, `npm run dev`, `npm run build`, `npm test`
@@ -84,4 +86,4 @@ tsconfig.json              # TypeScript configuration
 - Do not remove OCR fallback or search unless explicitly requested.
 - When modifying highlight logic, test both portrait and landscape modes.
 - The `clearHighlights()` public method clears state; internal renders use `clearHighlightDom()`.
-- Version constant in flipbook.ts should match intended release version.
+- Version constant in flipbook.ts should match intended release version (current: 0.3.0).

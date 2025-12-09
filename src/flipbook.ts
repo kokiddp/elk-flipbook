@@ -2,6 +2,7 @@
  * Elk Flipbook - Main Entry Point
  * 
  * Creates interactive PDF flipbooks with search, highlighting, and more.
+ * Hard-cover mode pads a blank page at the start/end while StPageFlip runs with showCover=false.
  * 
  * @example
  * ```js
@@ -41,7 +42,7 @@ import type {
 } from './types/api';
 
 /** Library version */
-export const VERSION = '0.2.0';
+export const VERSION = '0.3.0';
 
 /** Track all active instances for global management */
 const activeInstances: Set<FlipbookInstance> = new Set();
@@ -230,6 +231,7 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
     const pageOffset = hardCover ? 1 : 0;
 
     if (hardCover) {
+      // Pad blank pages to mimic covers while keeping StPageFlip in showCover=false mode
       const blankFront = createBlankPage(baseWidth, baseHeight);
       const blankBack = createBlankPage(baseWidth, baseHeight);
       renderedPages.push(blankFront, blankBack);

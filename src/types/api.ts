@@ -177,7 +177,8 @@ export interface FlipbookOptions {
   source: PdfSource;
 
   /**
-   * Enable hard cover effect (first and last pages have book cover appearance).
+   * Enable hard cover effect (pads a blank page at the start/end to simulate covers).
+   * When true, extra blank pages are added in front/back while StPageFlip still renders with showCover=false.
    * @default true
    */
   hardCover?: boolean;
