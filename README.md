@@ -118,6 +118,7 @@ Creates a new flipbook instance.
 **Behavior notes**
 
 - In hard-cover mode the first/last pages are blank padders; logical page numbers still match the PDF (page 1 = first real PDF page). Blank padders are skipped automatically on load and clamped on resize/orientation changes.
+- Clicks/taps on the book surface are clamped so you can’t flip into the padded blanks; only real pages are reachable.
 - Highlights clear as soon as navigation starts (flip gesture or programmatic navigation) and re-render after the new page settles.
 - Portrait mode renders the single page on the right half of the canvas (matching StPageFlip), which the highlight overlay respects.
 - pdf.js runs in a worker; call `destroy()` to tear down both the worker and any blob URLs created during rendering.
@@ -227,6 +228,11 @@ interface SearchResult {
 }
 ```
 
+Notes on search:
+- Matching is case-insensitive.
+- Results are returned in page order with a simple snippet around each hit.
+- `maxResults` (when provided) stops traversal early to keep large documents responsive.
+
 ## URL Parameters
 
 The flipbook can read initial search from URL parameters:
@@ -243,6 +249,20 @@ The flipbook can read initial search from URL parameters:
 - Keep search queries at or above `minQueryLength` to reduce unnecessary indexing work on short strings.
 - Call `destroy()` when the viewer is no longer needed to release blob URLs and the pdf.js worker.
 - Keep `esbuild` patched (>=0.24.3; repo pins to 0.27.x via overrides) and reinstall dependencies after upgrading Node to avoid audit noise.
+- For UMD usage, externals map to globals: `page-flip` → `pageFlip`, `pdfjs-dist` → `pdfjsDist`, `tesseract.js` → `tesseract_js`.
+
+## URL parameters / prefill
+
+On initialization, the flipbook can prefill and run a search from the page URL:
+
+- `?q=keyword`
+- `?search=keyword`
+- `?query=keyword`
+
+Prefill behavior:
+- Enabled by default via `readSearchFromUrl: true`.
+- Use `initialSearch` to provide a search string programmatically (takes precedence over URL params).
+- When search UI is enabled, the query input is set to the prefill term and results are rendered automatically; the first result is highlighted when `autoHighlightFirst` is true.
 
 ## Global Instance Management
 

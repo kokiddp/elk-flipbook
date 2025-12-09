@@ -1,10 +1,11 @@
 import type { SearchResult } from '../types/api';
 
 export class SearchIndex {
-  private pages = new Map<number, string>();
+  private pages = new Map<number, { raw: string; lower: string }>();
 
   addPage(page: number, text: string): void {
-    this.pages.set(page, text);
+    const raw = text ?? '';
+    this.pages.set(page, { raw, lower: raw.toLowerCase() });
   }
 
   search(query: string, maxResults?: number): SearchResult[] {
@@ -15,8 +16,10 @@ export class SearchIndex {
 
     const results: SearchResult[] = [];
 
-    for (const [page, text] of this.pages) {
-      const haystack = text.toLowerCase();
+    const hardLimit = typeof maxResults === 'number' && maxResults > 0 ? maxResults : undefined;
+
+    for (const [page, entry] of this.pages) {
+      const haystack = entry.lower;
       let start = 0;
 
       while (start <= haystack.length) {
@@ -27,14 +30,18 @@ export class SearchIndex {
           page,
           index,
           length: normalized.length,
-          snippet: buildSnippet(text, index, normalized.length)
+          snippet: buildSnippet(entry.raw, index, normalized.length)
         });
 
-        if (maxResults && results.length >= maxResults) {
+        if (hardLimit && results.length >= hardLimit) {
           return results;
         }
 
         start = index + normalized.length;
+      }
+
+      if (hardLimit && results.length >= hardLimit) {
+        return results;
       }
     }
 

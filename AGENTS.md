@@ -67,6 +67,8 @@ tsconfig.json              # TypeScript configuration
 - URL parameter support: `?q=`, `?search=`, `?query=`
 - Optional `initialSearch` for pre-loaded queries
 - Built-in SearchUI with customizable position, labels (i18n), and styling
+- SearchIndex stores lowercased text per page to avoid repeated normalization and respects `maxResults` to short-circuit traversal.
+- UMD globals: `page-flip` → `pageFlip`, `pdfjs-dist` → `pdfjsDist`, `tesseract.js` → `tesseract_js`.
 
 ## Performance and UX
 - Pages rendered at configurable scale (default 1.4) for quality/performance balance.
@@ -87,3 +89,4 @@ tsconfig.json              # TypeScript configuration
 - When modifying highlight logic, test both portrait and landscape modes.
 - The `clearHighlights()` public method clears state; internal renders use `clearHighlightDom()`.
 - Version constant in flipbook.ts should match intended release version (current: 0.3.0).
+- Publish metadata (package.json) points to https://github.com/kokiddp/elk-flipbook with MIT license (LICENSE.md) and author/email set to ELK-Lab.

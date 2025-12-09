@@ -1,0 +1,16 @@
+src/demo
+node_modules
+dist/**/*.map
+dist/**/*.tsbuildinfo
+.DS_Store
+.idea
+.vscode
+coverage
+*.log
+*.tgz
+*.tmp
+tmp
+tsconfig.node.json
+tsconfig.json
+vite.config.ts
+AGENTS.md
