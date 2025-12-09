@@ -146,6 +146,32 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
   let documentProxy: Awaited<ReturnType<typeof loadPdfDocument>>;
   let pageCount = 0;
 
+  const createBlankPage = (width: number, height: number): RenderedPage => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+    }
+    const dataUrl = canvas.toDataURL('image/png');
+    const byteString = atob(dataUrl.split(',')[1] ?? '');
+    const array = new Uint8Array(byteString.length);
+    for (let i = 0; i < byteString.length; i += 1) {
+      array[i] = byteString.charCodeAt(i);
+    }
+    const blob = new Blob([array], { type: 'image/png' });
+    const url = URL.createObjectURL(blob);
+    return {
+      url,
+      blob,
+      width,
+      height,
+      cleanup: () => URL.revokeObjectURL(url)
+    };
+  };
+
   try {
     emitProgress({ phase: 'loading', message: 'Loading PDF…', progress: 0 });
     documentProxy = await loadPdfDocument(source);
@@ -199,12 +225,26 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
     }
 
     // Create the view
+    const baseWidth = assets[0]?.width ?? 600;
+    const baseHeight = assets[0]?.height ?? 800;
+    const pageOffset = hardCover ? 1 : 0;
+
+    if (hardCover) {
+      const blankFront = createBlankPage(baseWidth, baseHeight);
+      const blankBack = createBlankPage(baseWidth, baseHeight);
+      renderedPages.push(blankFront, blankBack);
+      assets.unshift({ url: blankFront.url, width: blankFront.width, height: blankFront.height });
+      assets.push({ url: blankBack.url, width: blankBack.width, height: blankBack.height });
+    }
+
     view = new FlipbookView(container, {
       hardCover,
-      basePageWidth: assets[0]?.width ?? 600,
-      basePageHeight: assets[0]?.height ?? 800,
+      basePageWidth: baseWidth,
+      basePageHeight: baseHeight,
       textLayers,
       highlightColor: search.highlightColor,
+      pageOffset,
+      totalPages: pageCount,
       onFlip: (page) => {
         onPageChange?.(page, pageCount);
         emit('pagechange', { page, totalPages: pageCount });
@@ -213,10 +253,9 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
 
     view.loadFromAssets(assets);
 
-    // Navigate to start page if specified
-    if (startPage > 1 && startPage <= pageCount) {
-      view.goToPage(startPage);
-    }
+    // Navigate to start page (default 1) to skip padding blanks
+    const initialPage = Math.max(1, Math.min(pageCount, startPage));
+    view.goToPage(initialPage, false);
 
     // Create the instance
     const instance: FlipbookInstance = {

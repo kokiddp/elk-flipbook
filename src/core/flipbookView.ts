@@ -14,6 +14,8 @@ export interface FlipbookViewOptions {
   onFlip?: (page: number) => void;
   highlightColor?: string;
   textLayers?: Map<number, TextSpan[]>;
+  pageOffset?: number;
+  totalPages?: number;
 }
 
 export class FlipbookView {
@@ -24,11 +26,12 @@ export class FlipbookView {
   private highlights: HTMLElement[] = [];
   private readonly basePageWidth: number;
   private readonly basePageHeight: number;
+  private readonly pageOffset: number;
+  private readonly totalPages: number;
   private activeHighlight: { page: number; start: number; length: number } | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private resizeHandler: () => void;
   private pendingHighlightRender: number | null = null;
-  private readonly hasHardCover: boolean;
 
   /**
    * Convert a CSS color to rgba string with the given multiplier for alpha.
@@ -77,7 +80,8 @@ export class FlipbookView {
 
     this.basePageWidth = this.options.basePageWidth;
     this.basePageHeight = this.options.basePageHeight;
-    this.hasHardCover = !!this.options.hardCover;
+    this.pageOffset = Math.max(0, this.options.pageOffset ?? 0);
+    this.totalPages = this.options.totalPages ?? 0;
 
     if (this.options.highlightColor) {
       this.root.style.setProperty('--elk-highlight-color', this.toRgba(this.options.highlightColor, 0.8));
@@ -104,25 +108,36 @@ export class FlipbookView {
       minWidth: 320,
       minHeight: 320,
       maxShadowOpacity: 0.5,
-      showCover: !!this.options.hardCover,
+      showCover: false,
       usePortrait: true,
       autoSize: true
     });
 
     this.pageFlip.on('flip', (event) => {
-      const pageNumber = typeof event.data === 'number' ? event.data + 1 : Number(event.data) + 1;
+      const physicalIndex = typeof event.data === 'number' ? event.data : Number(event.data);
+      const pageNumber = physicalIndex + 1;
+      const logicalPage = Math.max(1, Math.min(this.getPageCount(), pageNumber - this.pageOffset));
       // Delay highlight rendering to ensure page flip animation has settled
       this.scheduleHighlightRender();
-      this.options.onFlip?.(pageNumber);
+      this.options.onFlip?.(logicalPage);
+    });
+
+    // Hide highlight overlay as soon as a flip begins (desktop or mobile)
+    this.pageFlip.on('changeState', (_app, state: string) => {
+      if (state === 'flipping' || state === 'user_fold') {
+        this.clearHighlightDom();
+      }
     });
 
     // Re-render highlights when orientation changes (portrait <-> landscape)
     this.pageFlip.on('changeOrientation', () => {
+      this.clampToLogicalRange();
       this.scheduleHighlightRender();
     });
 
     this.resizeHandler = () => {
       this.pageFlip.update();
+      this.clampToLogicalRange();
       this.scheduleHighlightRender();
     };
 
@@ -146,6 +161,7 @@ export class FlipbookView {
 
   loadFromAssets(assets: PageAsset[]): void {
     this.pageFlip.loadFromImages(assets.map((asset) => asset.url));
+    this.clampToLogicalRange();
   }
 
   goToPage(page: number, animate = true): void {
@@ -153,8 +169,9 @@ export class FlipbookView {
     if (total === 0) {
       return;
     }
+    this.clearHighlightDom();
     const clampedPage = Math.max(1, Math.min(total, page));
-    const target = clampedPage - 1;
+    const target = clampedPage - 1 + this.pageOffset;
     if (animate) {
       this.pageFlip.flip(target);
     } else {
@@ -167,8 +184,9 @@ export class FlipbookView {
     if (total === 0) {
       return;
     }
+    this.clearHighlightDom();
     const currentIndex = this.pageFlip.getCurrentPageIndex();
-    if (currentIndex < total - 1) {
+    if (currentIndex < total - 1 + this.pageOffset) {
       this.pageFlip.flipNext();
     }
   }
@@ -178,18 +196,40 @@ export class FlipbookView {
     if (total === 0) {
       return;
     }
+    this.clearHighlightDom();
     const currentIndex = this.pageFlip.getCurrentPageIndex();
-    if (currentIndex > 0) {
+    if (currentIndex > this.pageOffset) {
       this.pageFlip.flipPrev();
     }
   }
 
   getPageCount(): number {
-    return this.pageFlip.getPageCount();
+    return this.totalPages || Math.max(0, this.pageFlip.getPageCount() - this.pageOffset * 2);
   }
 
   getCurrentPage(): number {
-    return this.pageFlip.getCurrentPageIndex() + 1;
+    const logicalIndex = this.pageFlip.getCurrentPageIndex() - this.pageOffset;
+    return Math.max(1, Math.min(this.getPageCount(), logicalIndex + 1));
+  }
+
+  private clampToLogicalRange(): void {
+    const physicalCount = this.pageFlip.getPageCount();
+    if (physicalCount === 0) {
+      return;
+    }
+
+    const firstIndex = this.pageOffset;
+    const lastIndex = this.pageOffset + Math.max(0, this.getPageCount() - 1);
+    const currentIndex = this.pageFlip.getCurrentPageIndex();
+
+    if (currentIndex < firstIndex) {
+      this.pageFlip.turnToPage(firstIndex);
+      return;
+    }
+
+    if (currentIndex > lastIndex) {
+      this.pageFlip.turnToPage(lastIndex);
+    }
   }
 
   /**
@@ -231,29 +271,16 @@ export class FlipbookView {
   private isPageVisible(pageNumber: number): boolean {
     const currentIndex = this.pageFlip.getCurrentPageIndex();
     const orientation = this.pageFlip.getOrientation();
-    const targetIndex = pageNumber - 1;
+    const targetIndex = pageNumber - 1 + this.pageOffset;
 
     if (orientation === 'portrait') {
       return targetIndex === currentIndex;
     }
 
-    // Landscape mode: handle both cover and no-cover flows
-    if (this.hasHardCover && currentIndex === 0) {
-      return targetIndex === 0;
-    }
+    const leftPageIndex = currentIndex % 2 === 0 ? currentIndex : currentIndex - 1;
+    const rightPageIndex = leftPageIndex + 1;
 
-    const leftPageIndex = this.hasHardCover
-      ? currentIndex % 2 === 1
-        ? currentIndex
-        : currentIndex - 1
-      : currentIndex % 2 === 0
-        ? currentIndex
-        : currentIndex - 1;
-
-    const normalizedLeft = Math.max(0, leftPageIndex);
-    const rightPageIndex = normalizedLeft + 1;
-
-    return targetIndex === normalizedLeft || targetIndex === rightPageIndex;
+    return targetIndex === leftPageIndex || targetIndex === rightPageIndex;
   }
 
   /**
@@ -264,7 +291,7 @@ export class FlipbookView {
    * The rect.left/top values are the position within the canvas, and pageWidth/height are the page dimensions.
    */
   private getPagePosition(pageNumber: number): { x: number; y: number; width: number; height: number } | null {
-    const pageIndex = pageNumber - 1;
+    const pageIndex = pageNumber - 1 + this.pageOffset;
     const orientation = this.pageFlip.getOrientation();
     const bookRect = this.pageFlip.getBoundsRect();
     
@@ -295,24 +322,7 @@ export class FlipbookView {
     const bookOriginY = canvasRect.top + bookTopInCanvas - overlayRect.top;
 
     if (orientation === 'portrait') {
-      // Portrait: book width equals pageWidth, keep centered
-      const availableWidth = bookRect.width * canvasScaleX;
-      const centerOffset = Math.max(0, (availableWidth - displayPageWidth) / 2);
-      return {
-        x: bookOriginX + centerOffset,
-        y: bookOriginY,
-        width: displayPageWidth,
-        height: displayPageHeight
-      };
-    }
-
-    // Landscape mode: 2-page spread
-    const currentIndex = this.pageFlip.getCurrentPageIndex();
-    
-    // With hard cover:
-    // - Index 0 (cover) is shown alone on the right half
-    // - Subsequent spreads pair odd+even indices: [1,2], [3,4], [5,6]
-    if (this.hasHardCover && currentIndex === 0 && pageIndex === 0) {
+      // In portrait mode PageFlip renders a single page on the right half of the spread
       return {
         x: bookOriginX + displayPageWidth,
         y: bookOriginY,
@@ -321,19 +331,12 @@ export class FlipbookView {
       };
     }
 
-    // Determine left/right positioning for spread pages
-    const leftPageIndex = this.hasHardCover
-      ? currentIndex % 2 === 1
-        ? currentIndex
-        : currentIndex - 1
-      : currentIndex % 2 === 0
-        ? currentIndex
-        : currentIndex - 1;
+    // Landscape mode: 2-page spread (no cover; blank padding handled by offset)
+    const currentIndex = this.pageFlip.getCurrentPageIndex();
+    const leftPageIndex = currentIndex % 2 === 0 ? currentIndex : currentIndex - 1;
+    const rightPageIndex = leftPageIndex + 1;
 
-    const normalizedLeft = Math.max(0, leftPageIndex);
-    const rightPageIndex = normalizedLeft + 1;
-    
-    if (pageIndex === normalizedLeft) {
+    if (pageIndex === leftPageIndex) {
       return {
         x: bookOriginX,
         y: bookOriginY,
@@ -414,7 +417,7 @@ export class FlipbookView {
   highlightMatch(page: number, start: number, length: number): void {
     this.activeHighlight = { page, start, length };
 
-    const targetIndex = page - 1;
+    const targetIndex = page - 1 + this.pageOffset;
     
     // Check if we're already on the target page
     if (this.isPageVisible(page)) {
@@ -423,6 +426,7 @@ export class FlipbookView {
     } else {
       // Navigate to the page
       // Use turnToPage for immediate jump, or flip for animation
+      this.clearHighlightDom();
       this.pageFlip.turnToPage(targetIndex);
       // Give PageFlip time to update DOM, then render highlight
       setTimeout(() => {
