@@ -40,13 +40,7 @@ export class OcrEngine {
 
   private ensureWorker(): Promise<Worker> {
     if (!this.workerPromise) {
-      this.workerPromise = (async () => {
-        const worker = createWorker();
-        await worker.load();
-        await worker.loadLanguage(this.options.lang);
-        await worker.initialize(this.options.lang);
-        return worker;
-      })();
+      this.workerPromise = createWorker(this.options.lang);
     }
 
     return this.workerPromise;

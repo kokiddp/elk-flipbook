@@ -140,11 +140,11 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
   let currentHighlightIndex = -1;
   let searchQuery: string | null = null;
   let searchUIInstance: SearchUI | null = null;
-  let view: FlipbookView;
-  let searchIndex: SearchIndex;
+  let view: FlipbookView | null = null;
+  let searchIndex: SearchIndex | null = null;
   let renderedPages: RenderedPage[] = [];
-  let ocrEngine: OcrEngine;
-  let documentProxy: Awaited<ReturnType<typeof loadPdfDocument>>;
+  let ocrEngine: OcrEngine | null = null;
+  let documentProxy: Awaited<ReturnType<typeof loadPdfDocument>> | null = null;
   let pageCount = 0;
 
   const createBlankPage = (width: number, height: number): RenderedPage => {
@@ -263,14 +263,14 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
     const instance: FlipbookInstance = {
       // Navigation
       goToPage: (page: number, animate = true) => {
-        view.goToPage(page, animate);
+        view?.goToPage(page, animate);
       },
-      nextPage: () => view.nextPage(),
-      previousPage: () => view.previousPage(),
-      firstPage: () => view.goToPage(1),
-      lastPage: () => view.goToPage(pageCount),
+      nextPage: () => view?.nextPage(),
+      previousPage: () => view?.previousPage(),
+      firstPage: () => view?.goToPage(1),
+      lastPage: () => view?.goToPage(pageCount),
       getPageCount: () => pageCount,
-      getCurrentPage: () => view.getCurrentPage(),
+      getCurrentPage: () => view?.getCurrentPage() ?? 1,
 
       // Search
       search: async (query: string): Promise<SearchResult[]> => {
@@ -282,8 +282,13 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
           return [];
         }
 
+        const index = searchIndex;
+        if (!index) {
+          return [];
+        }
+
         searchQuery = query;
-        searchResults = searchIndex.search(query, search.maxResults);
+        searchResults = index.search(query, search.maxResults);
         currentHighlightIndex = -1;
         
         onSearch?.(query, searchResults);
@@ -297,7 +302,7 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
           r => r.page === result.page && r.index === result.index
         );
         currentHighlightIndex = idx >= 0 ? idx : -1;
-        view.highlightMatch(result.page, result.index, result.length);
+        view?.highlightMatch(result.page, result.index, result.length);
         
         if (currentHighlightIndex >= 0) {
           onHighlight?.(result, currentHighlightIndex);
@@ -306,7 +311,7 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
       },
 
       clearHighlights: () => {
-        view.clearHighlights();
+        view?.clearHighlights();
         currentHighlightIndex = -1;
       },
 
@@ -364,26 +369,26 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
       // State
       getState: (): FlipbookState => ({
         ready: isReady,
-        currentPage: view.getCurrentPage(),
+        currentPage: view?.getCurrentPage() ?? 1,
         pageCount,
         searchQuery,
         searchResults: [...searchResults],
         highlightIndex: currentHighlightIndex,
-        orientation: view.getOrientation()
+        orientation: view?.getOrientation() ?? 'portrait'
       }),
 
       isReady: () => isReady,
 
       // Lifecycle
-      update: () => view.update(),
+      update: () => view?.update(),
 
       destroy: () => {
         emit('destroy', {});
         searchUIInstance?.destroy();
-        view.destroy();
+        view?.destroy();
         renderedPages.forEach((page) => page.cleanup());
-        ocrEngine.terminate();
-        documentProxy.destroy();
+        void ocrEngine?.terminate();
+        void documentProxy?.destroy();
         destroyPdfWorker();
         activeInstances.delete(instance);
         eventHandlers.clear();
@@ -435,6 +440,13 @@ export async function createFlipbook(options: FlipbookOptions): Promise<Flipbook
     return instance;
 
   } catch (error) {
+    searchUIInstance?.destroy();
+    view?.destroy();
+    renderedPages.forEach((page) => page.cleanup());
+    renderedPages = [];
+    void ocrEngine?.terminate();
+    void documentProxy?.destroy();
+
     const err = error instanceof Error ? error : new Error(String(error));
     emitProgress({
       phase: 'error',

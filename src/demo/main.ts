@@ -23,6 +23,33 @@ function setStatus(message: string): void {
   }
 }
 
+function resolvePdfSource(): string {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('pdf') ?? params.get('source') ?? demoPdf;
+}
+
+function resolveOcrEnabled(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  const value = params.get('ocr');
+  return value === '1' || value === 'true';
+}
+
+function getBootstrapErrorMessage(source: string, error: unknown): string {
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  const normalizedMessage = rawMessage.toLowerCase();
+  const isRemoteSource = /^https?:\/\//i.test(source);
+  const isLikelyCorsError =
+    normalizedMessage.includes('failed to fetch') ||
+    normalizedMessage.includes('network') ||
+    normalizedMessage.includes('cors');
+
+  if (isRemoteSource && isLikelyCorsError) {
+    return 'Failed to load PDF. Remote URLs must allow CORS, or you can proxy them through Vite.';
+  }
+
+  return rawMessage;
+}
+
 function updateSearchMeta(): void {
   if (!searchCount) return;
   if (!searchResults.length) {
@@ -116,6 +143,8 @@ async function bootstrap(): Promise<void> {
   }
 
   const initialQuery = new URLSearchParams(window.location.search).get('q') ?? '';
+  const source = resolvePdfSource();
+  const ocrEnabled = resolveOcrEnabled();
   if (searchInput && initialQuery) {
     searchInput.value = initialQuery;
   }
@@ -124,9 +153,10 @@ async function bootstrap(): Promise<void> {
   try {
     flipbook = await createFlipbook({
       container: viewer,
-      source: demoPdf,
+      source,
       hardCover: true,
       renderScale: 1.5,
+      ocr: { enabled: ocrEnabled },
       search: { highlightColor: '#f59e0b' },
       onProgress: (event) => {
         const message = event.message ?? event.phase;
@@ -145,7 +175,7 @@ async function bootstrap(): Promise<void> {
     }
   } catch (error) {
     console.error('Failed to bootstrap flipbook', error);
-    setStatus(`Error: ${(error as Error).message}`);
+    setStatus(`Error: ${getBootstrapErrorMessage(source, error)}`);
   }
 }
 

@@ -1,4 +1,4 @@
-# Elk Flipbook (v0.3.0)
+# Elk Flipbook (v0.4.0)
 
 JavaScript widget to embed PDFs as an interactive flipbook with optional hard cover, realistic page-leaf animations, and full-text search (with OCR fallback for scanned documents).
 
@@ -140,9 +140,9 @@ Creates a new flipbook instance.
 
 #### OcrOptions
 
-- `enabled`: run Tesseract.js on pages with low text density.
+- `enabled`: run Tesseract.js on pages with low text density (default `true`).
 - `lang`: language code passed to Tesseract (default `eng`).
-- `minTextLength`: minimum extracted characters before OCR kicks in.
+- `minTextLength`: minimum extracted characters before OCR kicks in (default `16`).
 
 #### Event Callbacks
 
@@ -297,7 +297,7 @@ destroyAll();
   ocr: {
     enabled: true,      // Enable OCR for scanned pages
     lang: 'eng',        // Tesseract language code
-    minTextLength: 50   // Min text chars before triggering OCR
+    minTextLength: 16   // Min text chars before triggering OCR
   }
 }
 ```

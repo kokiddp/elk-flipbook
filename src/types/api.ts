@@ -138,7 +138,7 @@ export interface SearchUILabels {
 export interface OcrOptions {
   /**
    * Enable OCR for pages with low text density.
-   * @default false
+   * @default true
    */
   enabled?: boolean;
 
@@ -151,7 +151,7 @@ export interface OcrOptions {
   /**
    * Minimum text length threshold. Pages with less text
    * than this will be processed with OCR.
-   * @default 50
+   * @default 16
    */
   minTextLength?: number;
 }

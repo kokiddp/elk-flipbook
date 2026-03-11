@@ -34,6 +34,7 @@ export class FlipbookView {
   private resizeObserver: ResizeObserver | null = null;
   private resizeHandler: () => void;
   private pendingHighlightRender: number | null = null;
+  private pendingHighlightTimeout: number | null = null;
 
   /**
    * Convert a CSS color to rgba string with the given multiplier for alpha.
@@ -476,7 +477,11 @@ export class FlipbookView {
       this.clearHighlightDom();
       this.pageFlip.turnToPage(targetIndex);
       // Give PageFlip time to update DOM, then render highlight
-      setTimeout(() => {
+      if (this.pendingHighlightTimeout !== null) {
+        window.clearTimeout(this.pendingHighlightTimeout);
+      }
+      this.pendingHighlightTimeout = window.setTimeout(() => {
+        this.pendingHighlightTimeout = null;
         this.scheduleHighlightRender();
       }, 100);
     }
@@ -485,6 +490,9 @@ export class FlipbookView {
   destroy(): void {
     if (this.pendingHighlightRender !== null) {
       window.cancelAnimationFrame(this.pendingHighlightRender);
+    }
+    if (this.pendingHighlightTimeout !== null) {
+      window.clearTimeout(this.pendingHighlightTimeout);
     }
     this.pageFlip.destroy();
     this.root.remove();
