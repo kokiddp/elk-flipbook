@@ -1,6 +1,6 @@
 {
   "name": "elk-flipbook",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "PDF flipbook widget with searchable text and OCR fallback",
   "author": "ELK-Lab <gabriele@elk-lab.com>",
   "license": "MIT",
